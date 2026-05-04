@@ -398,22 +398,32 @@ input[type=range]::-webkit-slider-thumb {
           </div>
         </div>
 
+        <div class="sec-label" style="margin-top:16px;">Tipo de riesgo</div>
+        <div class="filter-group">
+          <div class="iep-btns">
+            <span class="iep-btn active" style="background:rgba(0,230,118,.1);color:#00c864;border-color:#00c864;" onclick="toggleRisk('Sin amenaza prioritaria',this)">🟢 Sin amenaza</span>
+            <span class="iep-btn active" style="background:rgba(41,121,255,.1);color:#4da3ff;border-color:#4da3ff;" onclick="toggleRisk('Inundación',this)">💧 Inundación</span>
+            <span class="iep-btn active" style="background:rgba(255,109,0,.1);color:#ff8c42;border-color:#ff8c42;" onclick="toggleRisk('Deslizamiento',this)">⛰️ Deslizamiento</span>
+            <span class="iep-btn active" style="background:rgba(139,195,74,.1);color:#8bc34a;border-color:#8bc34a;" onclick="toggleRisk('Erosión',this)">🌱 Erosión</span>
+            <span class="iep-btn active" style="background:rgba(255,193,7,.1);color:#ffc107;border-color:#ffc107;" onclick="toggleRisk('Expansión urbana no controlada',this)">🏗️ Expansión urbana</span>
+          </div>
+        </div>
+
         <div class="sec-label" style="margin-top:16px;">Municipio</div>
         <div id="mun-btns" style="line-height:2;">
           <span class="mun-btn active" onclick="filterMun('todos',this)">Todos</span>
-          <span class="mun-btn" onclick="filterMun('Apodaca',this)">Apodaca</span>
-          <span class="mun-btn" onclick="filterMun('García',this)">García</span>
-          <span class="mun-btn" onclick="filterMun('San Pedro Garza García',this)">San Pedro GG</span>
-          <span class="mun-btn" onclick="filterMun('General Escobedo',this)">Escobedo</span>
-          <span class="mun-btn" onclick="filterMun('Guadalupe',this)">Guadalupe</span>
-          <span class="mun-btn" onclick="filterMun('Juárez',this)">Juárez</span>
           <span class="mun-btn" onclick="filterMun('Monterrey',this)">Monterrey</span>
-          <span class="mun-btn" onclick="filterMun('Santiago',this)">Santiago</span>
-          <span class="mun-btn" onclick="filterMun('Santa Catarina',this)">Sta Catarina</span>
+          <span class="mun-btn" onclick="filterMun('Guadalupe',this)">Guadalupe</span>
+          <span class="mun-btn" onclick="filterMun('Apodaca',this)">Apodaca</span>
+          <span class="mun-btn" onclick="filterMun('Juárez',this)">Juárez</span>
+          <span class="mun-btn" onclick="filterMun('General Escobedo',this)">Escobedo</span>
           <span class="mun-btn" onclick="filterMun('San Nicolás de los Garza',this)">San Nicolás</span>
+          <span class="mun-btn" onclick="filterMun('García',this)">García</span>
+          <span class="mun-btn" onclick="filterMun('Santa Catarina',this)">Sta Catarina</span>
+          <span class="mun-btn" onclick="filterMun('San Pedro Garza García',this)">San Pedro GG</span>
+          <span class="mun-btn" onclick="filterMun('Santiago',this)">Santiago</span>
+          <span class="mun-btn" onclick="filterMun('Pesquería',this)">Pesquería</span>
           <span class="mun-btn" onclick="filterMun('Cadereyta Jiménez',this)">Cadereyta</span>
-          <span class="mun-btn" onclick="filterMun('Salinas Victoria',this)">Salinas Vic.</span>
-          <span class="mun-btn" onclick="filterMun('Montemorelos',this)">Montemorelos</span>
         </div>
 
         <div style="margin-top:16px;">
@@ -585,7 +595,7 @@ const URLS = {
   inun: 'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/a8af25dd-475d-46b8-9bc1-759d941d47da/data?token=epat_PvkiDG6HI1UvaVwmHp1EVHrYp13ulTZI9MltwXpftV7xjpz3egDBrWPsRwUxTM5m',
   enc:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/79425eb9-ad0c-4cf0-afde-7d13c2753c76/data?token=epat_ByHtH5D7N42eYUKoNBF0fgOSzaXV4LYob4EtEPbxgvD9nrAffpuN9KdLHGFWGZUn',
   geo:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/f8c2645d-dcca-4baa-bb5c-d881c055bd75/data?token=epat_rSSX32ziWBgS1rTk14CvNpKRmkFTyucDA8EtjVATZWm9BpjmQnWlHMe82MR77ggT',
-  iep:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/19e4bebd-f359-4463-aeb1-e993bce4de8c/data?token=epat_iLYyKxU7yllRD4xmi2NwuRV1MgvMt8DAPYm0KtlfR0S2pZmL2jUTiYdaEUb838sq',
+  iep:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/abfa22fa-e268-45cd-af60-204fb8a1cd58/data?token=epat_bECc6Gd6Vcz5u1FWrFQES4TwUQmsWXCb9CMrFNnuivDB2ZJKainpShh3kDRiC07S',
 };
 
 // ── Ellipsis Drive — IEP manzanas (descubrimiento automático) ───
@@ -601,7 +611,8 @@ let iepLayer = null, inunLayer = null, encLayer = null, geoLayer = null;
 let iepData = null;
 let activeIEP = new Set([1,2,3,4,5]);
 let activeTR  = new Set(['10 años','25 años','100 años','500 años','1000 años']);
-let activeMun = 'todos';
+let activeMun  = 'todos';
+let activeRisk = new Set(['Sin amenaza prioritaria','Inundación','Deslizamiento','Erosión','Expansión urbana no controlada']);
 let iepMin    = 0;
 let layerOpacity = 0.85;
 
@@ -674,9 +685,11 @@ function renderIEP(filter = false) {
   iepLayer = L.geoJSON(iepData, {
     style: feature => {
       const p = feature.properties;
+      const riesgo  = p.vulnerabilidad || 'Sin amenaza prioritaria';
       const visible = activeIEP.has(Number(p.iep_clase))
         && (p.iep_mean || 0) >= iepMin
-        && (activeMun === 'todos' || p.mun === activeMun);
+        && (activeMun === 'todos' || p.mun === activeMun)
+        && activeRisk.has(riesgo);
       if (!visible) {
         return { fillOpacity: 0, opacity: 0, weight: 0 };
       }
@@ -849,7 +862,16 @@ function toggleTR(tr, btn) {
   }
 }
 
+function toggleRisk(risk, btn) {
+  btn.classList.toggle('active');
+  if (activeRisk.has(risk)) activeRisk.delete(risk);
+  else activeRisk.add(risk);
+  renderIEP();
+}
+
 function filterMun(mun, btn) {
+  activeRisk = new Set(['Sin amenaza prioritaria','Inundación','Deslizamiento','Erosión','Expansión urbana no controlada']);
+  document.querySelectorAll('.iep-btn').forEach(b => b.classList.add('active'));
   document.querySelectorAll('.mun-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   activeMun = mun;
@@ -873,6 +895,8 @@ function resetFilters() {
   document.getElementById('iep-slider').value = 0;
   document.getElementById('iep-min-label').textContent = '0.0';
   document.getElementById('iep-filter-label').textContent = 'todas';
+  document.querySelectorAll('.iep-btn').forEach(b => b.classList.add('active'));
+  activeRisk = new Set(['Sin amenaza prioritaria','Inundación','Deslizamiento','Erosión','Expansión urbana no controlada']);
   document.querySelectorAll('.iep-btn').forEach(b => b.classList.add('active'));
   document.querySelectorAll('.mun-btn').forEach(b => b.classList.remove('active'));
   document.querySelector('.mun-btn').classList.add('active');
