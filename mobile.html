@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1012">
+<title>Geovisor Riesgo Metropolitano</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg:#0f1012; --surface:#181a1e; --surface2:#22252b; --border:#2e3138;
+  --blue:#2979ff; --blue2:#82b1ff;
+  --orange:#ff6d00; --orange2:#ffab40;
+  --green:#00e676; --green2:#69f0ae;
+  --red:#ff1744; --red2:#ff8a80;
+  --yellow:#ffd740;
+  --text:#f0f2f5; --text-dim:#9aa3b0; --text-muted:#4a5260;
+  --iep1:#1a9641; --iep2:#a6d96a; --iep3:#ffc107; --iep4:#f46d43; --iep5:#d73027;
+  --sheet-h: 60vh;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; overflow:hidden; touch-action:manipulation; }
+body { background:var(--bg); color:var(--text); font-family:'Barlow Condensed',sans-serif; font-size:16px; }
+
+/* ── MAP ── */
+#map { position:fixed; inset:0; z-index:1; }
+
+/* ── LOADING ── */
+#loading {
+  position:fixed; inset:0; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:9999; transition:opacity .5s;
+}
+#loading.fade { opacity:0; pointer-events:none; }
+.ld-logo { font-size:46px; font-weight:900; text-transform:uppercase; letter-spacing:-2px; margin-bottom:6px; }
+.ld-logo span { color:var(--orange); }
+.ld-sub { font-size:13px; color:var(--text-muted); margin-bottom:28px; }
+.ld-bar { width:200px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.ld-prog { height:100%; background:linear-gradient(90deg,var(--blue),var(--orange)); border-radius:2px; animation:ldprog 3s ease-out forwards; }
+@keyframes ldprog { 0%{width:0} 70%{width:80%} 95%{width:95%} 100%{width:100%} }
+.ld-msg { font-size:11px; color:var(--text-muted); margin-top:10px; }
+
+/* ── TOP BAR ── */
+#topbar {
+  position:fixed; top:0; left:0; right:0;
+  z-index:100;
+  padding:12px 14px 10px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  background:linear-gradient(180deg,rgba(15,16,18,.95) 60%,transparent);
+  display:flex; align-items:center; gap:10px;
+}
+.tb-title {
+  flex:1; font-size:17px; font-weight:900; text-transform:uppercase; letter-spacing:-.5px;
+}
+.tb-title span { color:var(--orange2); }
+.tb-btn {
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--text); border-radius:10px; padding:10px 14px;
+  font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
+  letter-spacing:.5px; text-transform:uppercase; cursor:pointer;
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+  min-height:42px;
+}
+.tb-btn:active { opacity:.7; }
+
+/* ── BOTTOM NAV ── */
+#bottom-nav {
+  position:fixed; bottom:0; left:0; right:0;
+  z-index:200;
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  display:flex;
+  padding-bottom:var(--safe-bottom);
+}
+.bn-item {
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:12px 6px; cursor:pointer; color:var(--text-muted);
+  font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+  transition:color .15s; gap:4px; min-height:60px;
+}
+.bn-item:active { background:var(--surface2); }
+.bn-item.active { color:var(--blue2); }
+.bn-icon { font-size:20px; line-height:1; }
+
+/* ── BOTTOM SHEET ── */
+#sheet-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.5);
+  z-index:300; display:none; opacity:0; transition:opacity .3s;
+}
+#sheet-overlay.show { display:block; opacity:1; }
+
+#bottom-sheet {
+  position:fixed; bottom:0; left:0; right:0;
+  z-index:400;
+  background:var(--surface);
+  border-radius:20px 20px 0 0;
+  max-height:85vh;
+  display:flex; flex-direction:column;
+  transform:translateY(100%);
+  transition:transform .35s cubic-bezier(.4,0,.2,1);
+  padding-bottom:var(--safe-bottom);
+}
+#bottom-sheet.open { transform:translateY(0); }
+
+.sheet-handle {
+  display:flex; justify-content:center; padding:14px 0 10px;
+  flex-shrink:0; cursor:pointer;
+}
+.sheet-handle-bar {
+  width:40px; height:4px; border-radius:2px; background:var(--border);
+}
+
+.sheet-header {
+  padding:0 20px 14px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.sheet-title {
+  font-size:20px; font-weight:900; text-transform:uppercase; letter-spacing:-.5px;
+}
+.sheet-sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
+
+/* Sheet tabs */
+.sheet-tabs {
+  display:flex; border-bottom:1px solid var(--border);
+  flex-shrink:0; overflow-x:auto; scrollbar-width:none;
+}
+.sheet-tabs::-webkit-scrollbar { display:none; }
+.sheet-tab {
+  flex:1; padding:14px 12px; text-align:center;
+  font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  color:var(--text-muted); cursor:pointer; border-bottom:3px solid transparent;
+  white-space:nowrap; min-width:80px;
+}
+.sheet-tab.active { color:var(--blue2); border-bottom-color:var(--blue2); }
+
+.sheet-body {
+  flex:1; overflow-y:auto; padding:16px 20px 20px;
+  scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+}
+.sheet-panel { display:none; }
+.sheet-panel.active { display:block; }
+
+/* ── SECTION LABELS ── */
+.sec-label {
+  font-size:9px; font-weight:800; letter-spacing:2.5px;
+  text-transform:uppercase; color:var(--orange2);
+  margin-bottom:8px; margin-top:16px;
+}
+.sec-label:first-child { margin-top:0; }
+
+/* ── LAYER ROWS ── */
+.layer-row {
+  display:flex; align-items:center; gap:12px;
+  padding:14px 16px; border-radius:10px; margin-bottom:6px;
+  background:var(--surface2); border:1px solid var(--border);
+  min-height:52px;
+}
+.layer-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.layer-name { flex:1; font-size:15px; font-weight:600; }
+.layer-count { font-size:11px; color:var(--text-muted); }
+.toggle-sw {
+  width:44px; height:24px; border-radius:12px;
+  background:var(--border); position:relative; cursor:pointer;
+  transition:background .2s; flex-shrink:0;
+}
+.toggle-sw.on { background:var(--blue); }
+.toggle-sw::after {
+  content:''; position:absolute; top:3px; left:3px;
+  width:18px; height:18px; border-radius:50%; background:#fff;
+  transition:transform .2s;
+}
+.toggle-sw.on::after { transform:translateX(20px); }
+
+/* ── BASE SELECTOR ── */
+.base-btns { display:flex; gap:8px; margin-bottom:4px; }
+.base-btn {
+  flex:1; padding:12px 8px; border-radius:10px; text-align:center;
+  font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  cursor:pointer; border:1.5px solid var(--border); color:var(--text-muted);
+  background:var(--surface2); min-height:44px;
+}
+.base-btn.active { border-color:var(--blue); color:var(--blue2); background:rgba(41,121,255,.08); }
+
+/* ── FILTER CHIPS ── */
+.chips-wrap { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:4px; }
+.fchip {
+  padding:8px 14px; border-radius:100px; font-size:12px; font-weight:700;
+  cursor:pointer; border:2px solid transparent; min-height:36px;
+  display:flex; align-items:center; gap:5px;
+}
+.fchip.active { border-color:currentColor; }
+
+/* ── SLIDER ── */
+.slider-wrap { padding:4px 0 8px; }
+input[type=range] {
+  width:100%; height:6px; border-radius:3px;
+  background:var(--border); outline:none; cursor:pointer; -webkit-appearance:none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:22px; height:22px;
+  border-radius:50%; background:var(--blue); cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.filter-lbl {
+  display:flex; justify-content:space-between;
+  font-size:12px; font-weight:700; color:var(--text-dim);
+  margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px;
+}
+.filter-lbl span { color:var(--text-muted); font-weight:400; }
+
+/* ── MUN CHIPS ── */
+.mun-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.mun-chip {
+  padding:8px 14px; border-radius:100px; font-size:12px; font-weight:700;
+  cursor:pointer; border:1.5px solid var(--border); color:var(--text-muted);
+  background:var(--surface2); min-height:36px;
+}
+.mun-chip.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+
+/* ── RESET BTN ── */
+.reset-btn {
+  width:100%; padding:16px; border-radius:12px; margin-top:16px;
+  background:var(--surface2); border:1.5px solid var(--border);
+  color:var(--text-dim); font-family:'Barlow Condensed',sans-serif;
+  font-size:14px; font-weight:800; letter-spacing:1px; text-transform:uppercase;
+  cursor:pointer; min-height:52px;
+}
+.reset-btn:active { opacity:.7; }
+
+/* ── INFO SHEET (manzana) ── */
+#info-sheet {
+  position:fixed; bottom:0; left:0; right:0;
+  z-index:500;
+  background:var(--surface);
+  border-radius:20px 20px 0 0;
+  transform:translateY(100%);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  padding:0 20px 20px;
+  padding-bottom:calc(20px + var(--safe-bottom));
+}
+#info-sheet.open { transform:translateY(0); }
+.is-handle {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 0 12px;
+}
+.is-title { font-size:18px; font-weight:900; text-transform:uppercase; letter-spacing:-.5px; }
+.is-close {
+  font-size:22px; color:var(--text-muted); cursor:pointer;
+  width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+  border-radius:50%; background:var(--surface2);
+}
+.ip-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 0; border-bottom:1px solid var(--border); font-size:14px;
+}
+.ip-row:last-child { border-bottom:none; }
+.ip-key { color:var(--text-muted); font-weight:500; }
+.ip-val { font-weight:800; font-size:14px; text-align:right; }
+.ip-iep-bar { height:8px; border-radius:4px; margin:12px 0 4px; }
+.ip-iep-label { font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; }
+
+/* ── STATS PANEL ── */
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:4px 0 14px; }
+.stat-c {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:10px; padding:14px 12px; text-align:center;
+}
+.stat-c .sv { font-size:28px; font-weight:900; line-height:1; }
+.stat-c .sl { font-size:10px; color:var(--text-muted); margin-top:3px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+.iep-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; }
+.iep-dot-sm { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.iep-bar-lbl { width:76px; font-weight:600; color:var(--text-dim); display:flex; align-items:center; gap:5px; }
+.iep-bar-track { flex:1; height:14px; background:var(--surface2); border-radius:7px; overflow:hidden; }
+.iep-bar-fill { height:100%; border-radius:7px; }
+.iep-bar-val { width:38px; text-align:right; font-size:11px; font-weight:700; color:var(--text-muted); }
+
+/* ── LEGEND (mini, siempre visible) ── */
+#legend-mini {
+  position:fixed; right:12px; top:70px; z-index:100;
+  background:rgba(24,26,30,.92); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px;
+  backdrop-filter:blur(8px);
+}
+.lm-title { font-size:9px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:var(--orange2); margin-bottom:7px; }
+.lm-row { display:flex; align-items:center; gap:7px; margin-bottom:5px; font-size:11px; font-weight:600; color:var(--text-dim); }
+.lm-row:last-child { margin-bottom:0; }
+.lm-dot { width:12px; height:12px; border-radius:3px; flex-shrink:0; }
+
+/* ── TOAST ── */
+#toast {
+  position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+  background:var(--surface2); border:1px solid var(--border);
+  padding:10px 20px; border-radius:10px; font-size:13px; font-weight:700;
+  z-index:600; opacity:0; transition:opacity .3s; pointer-events:none;
+  white-space:nowrap; max-width:90vw; text-align:center;
+}
+#toast.show { opacity:1; }
+
+/* ── ZOOM CTRL ── */
+.leaflet-control-zoom { border:1px solid var(--border) !important; border-radius:10px !important; overflow:hidden; }
+.leaflet-control-zoom a { background:var(--surface) !important; color:var(--text) !important; border-color:var(--border) !important; font-size:18px !important; width:38px !important; height:38px !important; line-height:38px !important; }
+.leaflet-control-zoom a:hover { background:var(--surface2) !important; }
+.leaflet-control-attribution { display:none !important; }
+
+/* ── POPUP ── */
+.leaflet-popup-content-wrapper { background:var(--surface) !important; border:1px solid var(--border) !important; border-radius:10px !important; color:var(--text) !important; }
+.leaflet-popup-tip { background:var(--surface) !important; }
+.leaflet-popup-content { font-family:'Barlow Condensed',sans-serif !important; font-size:14px !important; }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="ld-logo">GEO<span>VISOR</span></div>
+  <div class="ld-sub">Riesgos Metropolitanos · ZMM 2026</div>
+  <div class="ld-bar"><div class="ld-prog"></div></div>
+  <div class="ld-msg" id="ld-msg">Iniciando...</div>
+</div>
+
+<!-- MAP -->
+<div id="map"></div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="tb-title">RIESGO <span>ZMM</span></div>
+  <button class="tb-btn" onclick="zoomToZMM()">⌂</button>
+  <button class="tb-btn" onclick="toggleOpacity()">◑</button>
+</div>
+
+<!-- LEGEND MINI -->
+<div id="legend-mini">
+  <div class="lm-title">IEP</div>
+  <div class="lm-row"><div class="lm-dot" style="background:var(--iep1)"></div>Muy bajo</div>
+  <div class="lm-row"><div class="lm-dot" style="background:var(--iep2)"></div>Bajo</div>
+  <div class="lm-row"><div class="lm-dot" style="background:var(--iep3)"></div>Moderado</div>
+  <div class="lm-row"><div class="lm-dot" style="background:var(--iep4)"></div>Alto</div>
+  <div class="lm-row"><div class="lm-dot" style="background:var(--iep5)"></div>Muy alto</div>
+</div>
+
+<!-- SHEET OVERLAY -->
+<div id="sheet-overlay" onclick="closeSheet()"></div>
+
+<!-- BOTTOM SHEET -->
+<div id="bottom-sheet">
+  <div class="sheet-handle" onclick="closeSheet()">
+    <div class="sheet-handle-bar"></div>
+  </div>
+  <div class="sheet-header">
+    <div class="sheet-title" id="sheet-title">Capas</div>
+    <div class="sheet-sub">Geovisor Riesgo Metropolitano · ZMM 2026</div>
+  </div>
+  <div class="sheet-tabs">
+    <div class="sheet-tab active" onclick="showSheetTab('capas',this)">Capas</div>
+    <div class="sheet-tab" onclick="showSheetTab('filtros',this)">Filtros</div>
+    <div class="sheet-tab" onclick="showSheetTab('stats',this)">Stats</div>
+    <div class="sheet-tab" onclick="showSheetTab('info',this)">Info</div>
+  </div>
+  <div class="sheet-body">
+
+    <!-- CAPAS -->
+    <div class="sheet-panel active" id="st-capas">
+      <div class="sec-label">Mapa base</div>
+      <div class="base-btns">
+        <div class="base-btn active" id="bb-carto" onclick="toggleBase('carto',this)">🌑 Dark</div>
+        <div class="base-btn" id="bb-osm"   onclick="toggleBase('osm',this)">🗺 OSM</div>
+        <div class="base-btn" id="bb-esri"  onclick="toggleBase('esri',this)">🛰 Satélite</div>
+      </div>
+
+      <div class="sec-label" style="margin-top:18px;">Capas de análisis</div>
+      <div class="layer-row" onclick="toggleLayer('iep')">
+        <div class="layer-dot" style="background:linear-gradient(135deg,var(--iep1),var(--iep5))"></div>
+        <span class="layer-name">IEP por manzana</span>
+        <span class="layer-count">59,582</span>
+        <div class="toggle-sw on" id="sw-iep"></div>
+      </div>
+      <div class="layer-row" onclick="toggleLayer('inun')">
+        <div class="layer-dot" style="background:var(--blue)"></div>
+        <span class="layer-name">Zona inundación</span>
+        <span class="layer-count">47,407</span>
+        <div class="toggle-sw" id="sw-inun"></div>
+      </div>
+      <div class="layer-row" onclick="toggleLayer('enc')">
+        <div class="layer-dot" style="background:#00bcd4"></div>
+        <span class="layer-name">Encharcamiento</span>
+        <span class="layer-count">15,979</span>
+        <div class="toggle-sw" id="sw-enc"></div>
+      </div>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="sheet-panel" id="st-filtros">
+      <div class="sec-label">Clase IEP</div>
+      <div class="chips-wrap">
+        <span class="fchip active" style="background:rgba(26,150,65,.15);color:var(--iep1)" onclick="toggleIEP(1,this)">🟢 Muy bajo</span>
+        <span class="fchip active" style="background:rgba(166,217,106,.15);color:#7ab648" onclick="toggleIEP(2,this)">🟡 Bajo</span>
+        <span class="fchip active" style="background:rgba(255,193,7,.15);color:var(--yellow)" onclick="toggleIEP(3,this)">🟠 Moderado</span>
+        <span class="fchip active" style="background:rgba(244,109,67,.15);color:var(--iep4)" onclick="toggleIEP(4,this)">🔴 Alto</span>
+        <span class="fchip active" style="background:rgba(215,48,39,.15);color:var(--iep5)" onclick="toggleIEP(5,this)">🔺 Muy alto</span>
+      </div>
+
+      <div class="sec-label">Tipo de riesgo</div>
+      <div class="chips-wrap">
+        <span class="fchip active" style="background:rgba(0,230,118,.1);color:#00c864" onclick="toggleRisk('Sin amenaza prioritaria',this)">🟢 Sin amenaza</span>
+        <span class="fchip active" style="background:rgba(41,121,255,.1);color:var(--blue2)" onclick="toggleRisk('Inundación',this)">💧 Inundación</span>
+        <span class="fchip active" style="background:rgba(255,109,0,.1);color:var(--orange2)" onclick="toggleRisk('Deslizamiento',this)">⛰️ Deslizamiento</span>
+        <span class="fchip active" style="background:rgba(139,195,74,.1);color:#8bc34a" onclick="toggleRisk('Erosión',this)">🌱 Erosión</span>
+        <span class="fchip active" style="background:rgba(255,193,7,.1);color:var(--yellow)" onclick="toggleRisk('Expansión urbana no controlada',this)">🏗️ Expansión urbana</span>
+      </div>
+
+      <div class="sec-label">IEP mínimo</div>
+      <div class="filter-lbl">Umbral <span id="iep-min-label">0.0</span></div>
+      <div class="slider-wrap">
+        <input type="range" id="iep-slider" min="0" max="1" step="0.05" value="0" oninput="filterByIEP(this.value)">
+      </div>
+
+      <div class="sec-label">Período de retorno (inundación)</div>
+      <div class="chips-wrap">
+        <span class="fchip active" style="background:rgba(41,121,255,.1);color:var(--blue2)" onclick="toggleTR('10 años',this)">Tr10</span>
+        <span class="fchip active" style="background:rgba(41,121,255,.1);color:var(--blue2)" onclick="toggleTR('25 años',this)">Tr25</span>
+        <span class="fchip active" style="background:rgba(41,121,255,.1);color:var(--blue2)" onclick="toggleTR('100 años',this)">Tr100</span>
+        <span class="fchip active" style="background:rgba(41,121,255,.1);color:var(--blue2)" onclick="toggleTR('500 años',this)">Tr500</span>
+        <span class="fchip active" style="background:rgba(41,121,255,.1);color:var(--blue2)" onclick="toggleTR('1000 años',this)">Tr1000</span>
+      </div>
+
+      <div class="sec-label">Municipio</div>
+      <div class="mun-chips">
+        <span class="mun-chip active" onclick="filterMun('todos',this)">Todos</span>
+        <span class="mun-chip" onclick="filterMun('Monterrey',this)">Monterrey</span>
+        <span class="mun-chip" onclick="filterMun('Guadalupe',this)">Guadalupe</span>
+        <span class="mun-chip" onclick="filterMun('Apodaca',this)">Apodaca</span>
+        <span class="mun-chip" onclick="filterMun('Juárez',this)">Juárez</span>
+        <span class="mun-chip" onclick="filterMun('General Escobedo',this)">Escobedo</span>
+        <span class="mun-chip" onclick="filterMun('San Nicolás de los Garza',this)">San Nicolás</span>
+        <span class="mun-chip" onclick="filterMun('García',this)">García</span>
+        <span class="mun-chip" onclick="filterMun('Santa Catarina',this)">Sta Catarina</span>
+        <span class="mun-chip" onclick="filterMun('San Pedro Garza García',this)">San Pedro GG</span>
+        <span class="mun-chip" onclick="filterMun('Santiago',this)">Santiago</span>
+        <span class="mun-chip" onclick="filterMun('Pesquería',this)">Pesquería</span>
+        <span class="mun-chip" onclick="filterMun('Cadereyta Jiménez',this)">Cadereyta</span>
+      </div>
+
+      <button class="reset-btn" onclick="resetFilters()">↺ Resetear filtros</button>
+    </div>
+
+    <!-- STATS -->
+    <div class="sheet-panel" id="st-stats">
+      <div class="stats-grid">
+        <div class="stat-c"><div class="sv" style="color:var(--iep4)">248K</div><div class="sl">Hab. riesgo moderado+</div></div>
+        <div class="stat-c"><div class="sv" style="color:var(--red2)">1,552</div><div class="sl">Hab. riesgo alto</div></div>
+        <div class="stat-c"><div class="sv" style="color:var(--blue2)">16</div><div class="sl">Manzanas críticas</div></div>
+        <div class="stat-c"><div class="sv" style="color:var(--green2)">0.308</div><div class="sl">IEP media ZMM</div></div>
+      </div>
+
+      <div class="sec-label">Distribución IEP</div>
+      <div class="iep-bar-row"><span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep1)"></div>Muy bajo</span><div class="iep-bar-track"><div class="iep-bar-fill" style="width:8.4%;background:var(--iep1)"></div></div><span class="iep-bar-val">8.4%</span></div>
+      <div class="iep-bar-row"><span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep2)"></div>Bajo</span><div class="iep-bar-track"><div class="iep-bar-fill" style="width:78%;background:var(--iep2)"></div></div><span class="iep-bar-val">78.0%</span></div>
+      <div class="iep-bar-row"><span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep3)"></div>Moderado</span><div class="iep-bar-track"><div class="iep-bar-fill" style="width:12.4%;background:var(--iep3)"></div></div><span class="iep-bar-val">12.4%</span></div>
+      <div style="font-size:11px;color:var(--text-muted);padding:2px 0 8px 22px;">246,818 hab en riesgo moderado</div>
+      <div class="iep-bar-row"><span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep4)"></div>Alto</span><div class="iep-bar-track"><div class="iep-bar-fill" style="width:1.2%;background:var(--iep4)"></div></div><span class="iep-bar-val">1.2%</span></div>
+      <div style="font-size:11px;color:var(--text-muted);padding:2px 0 8px 22px;">1,552 hab en riesgo alto</div>
+      <div class="iep-bar-row"><span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep5)"></div>Muy alto</span><div class="iep-bar-track"><div class="iep-bar-fill" style="width:0.1%;background:var(--iep5)"></div></div><span class="iep-bar-val">0.0%</span></div>
+      <div style="font-size:11px;color:var(--text-muted);padding:2px 0 4px 22px;">Sin manzanas en riesgo muy alto</div>
+
+      <div class="sec-label" style="margin-top:16px;">Cambio uso de suelo 2017→2026</div>
+      <div style="background:var(--surface2);border-left:3px solid var(--red);border-radius:0 8px 8px 0;padding:10px 14px;margin-bottom:8px;">
+        <div style="font-size:24px;font-weight:900;color:var(--red)">33,675 ha</div>
+        <div style="font-size:12px;color:var(--text-muted);">Bosque → Urbano (Sierra Madre)</div>
+      </div>
+      <div style="background:var(--surface2);border-left:3px solid var(--orange);border-radius:0 8px 8px 0;padding:10px 14px;">
+        <div style="font-size:24px;font-weight:900;color:var(--orange2)">4,055 ha</div>
+        <div style="font-size:12px;color:var(--text-muted);">Bosque → Matorral</div>
+      </div>
+    </div>
+
+    <!-- INFO -->
+    <div class="sheet-panel" id="st-info">
+      <div class="sec-label">Variables IEP activas</div>
+      <div style="font-size:13px;color:var(--text-dim);line-height:2.0;">
+        <div>● V1 Pendiente (DEM INEGI) — <strong style="color:var(--orange2)">30%</strong></div>
+        <div>● V2 NDVI Sentinel-2 GEE — <strong style="color:var(--green2)">25%</strong></div>
+        <div>● V3 Precipitación CHIRPS — <strong style="color:var(--blue2)">20%</strong></div>
+        <div>● V4 Incendios FIRMS — <strong style="color:var(--red2)">15%</strong></div>
+        <div>● V5 Erodabilidad Geológica — <strong style="color:#d500f9">10%</strong></div>
+      </div>
+      <div class="sec-label" style="margin-top:14px;">Acerca</div>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.7;">
+        Sistema de análisis de riesgo metropolitano para la ZMM. Geomática MX · Blancas & Gómez Taller · Monterrey, NL · 2026.
+      </div>
+    </div>
+
+  </div>
+</div><!-- /bottom-sheet -->
+
+<!-- INFO SHEET (manzana) -->
+<div id="info-sheet">
+  <div class="is-handle">
+    <div class="is-title">Manzana</div>
+    <div class="is-close" onclick="closeInfoSheet()">×</div>
+  </div>
+  <div id="is-body"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div id="bottom-nav">
+  <div class="bn-item" onclick="openSheet('capas')">
+    <div class="bn-icon">🗂</div>
+    Capas
+  </div>
+  <div class="bn-item" onclick="openSheet('filtros')">
+    <div class="bn-icon">⚙️</div>
+    Filtros
+  </div>
+  <div class="bn-item" onclick="openSheet('stats')">
+    <div class="bn-icon">📊</div>
+    Stats
+  </div>
+  <div class="bn-item" onclick="openSheet('info')">
+    <div class="bn-icon">ℹ️</div>
+    Info
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN — mismas URLs que la versión desktop
+// ════════════════════════════════════════════════════════════════
+const ZMM_CENTER = [25.67, -100.31];
+const ZMM_ZOOM   = 11;
+const URLS = {
+  inun: 'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/a8af25dd-475d-46b8-9bc1-759d941d47da/data?token=epat_PvkiDG6HI1UvaVwmHp1EVHrYp13ulTZI9MltwXpftV7xjpz3egDBrWPsRwUxTM5m',
+  enc:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/79425eb9-ad0c-4cf0-afde-7d13c2753c76/data?token=epat_ByHtH5D7N42eYUKoNBF0fgOSzaXV4LYob4EtEPbxgvD9nrAffpuN9KdLHGFWGZUn',
+  iep:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/abfa22fa-e268-45cd-af60-204fb8a1cd58/data?token=epat_acbYpQq7N05Jum1xxCMCgdr7xWwjzZ2rnWafPkOiGhOIFmCgvJI8yHFgOis4Rcoq',
+};
+
+// ════════════════════════════════════════════════════════════════
+// ESTADO
+// ════════════════════════════════════════════════════════════════
+let map, baseLayers = {};
+let iepLayer=null, inunLayer=null, encLayer=null;
+let iepData=null;
+let activeIEP  = new Set([1,2,3,4,5]);
+let activeTR   = new Set(['10 años','25 años','100 años','500 años','1000 años']);
+let activeMun  = 'todos';
+let activeRisk = new Set(['Sin amenaza prioritaria','Inundación','Deslizamiento','Erosión','Expansión urbana no controlada']);
+let iepMin     = 0;
+let layerOpacity = 0.85;
+const IEP_COLORS = {1:'#1a9641',2:'#a6d96a',3:'#ffc107',4:'#f46d43',5:'#d73027'};
+
+// ════════════════════════════════════════════════════════════════
+// MAPA
+// ════════════════════════════════════════════════════════════════
+function initMap() {
+  map = L.map('map', { center:ZMM_CENTER, zoom:ZMM_ZOOM, zoomControl:false });
+  L.control.zoom({ position:'bottomright' }).addTo(map);
+
+  baseLayers.carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  baseLayers.osm   = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19});
+  baseLayers.esri  = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19});
+
+  // Offset del mapa por el bottom nav
+  map.invalidateSize();
+}
+
+// ════════════════════════════════════════════════════════════════
+// CARGAR CAPAS
+// ════════════════════════════════════════════════════════════════
+async function loadIEP() {
+  setLoadMsg('Descargando manzanas IEP (~30MB)...');
+  try {
+    const r = await fetch(URLS.iep);
+    if (!r.ok) throw new Error(`${r.status}`);
+    iepData = await r.json();
+    renderIEP();
+  } catch(e) {
+    showToast('⚠️ IEP no cargado — verifica Ellipsis Drive');
+    console.warn(e);
+  }
+}
+
+async function loadInundacion() {
+  try {
+    const r = await fetch(URLS.inun);
+    const data = await r.json();
+    const C = {'10 años':'#0d47a1','25 años':'#1565c0','100 años':'#1976d2','500 años':'#42a5f5','1000 años':'#90caf9'};
+    inunLayer = L.geoJSON(data, {
+      style: f => { const v=activeTR.has(f.properties.Per_Retorn); return {fillColor:C[f.properties.Per_Retorn]||'#1976d2',color:'#0d47a1',weight:.5,fillOpacity:v?.35:0,opacity:v?.6:0}; },
+      onEachFeature:(f,l)=>l.bindPopup(`<b>Inundación</b><br>Período: <b>${f.properties.Per_Retorn}</b>`)
+    });
+  } catch(e) { console.warn('Inundación:',e.message); }
+}
+
+async function loadEncharcamiento() {
+  try {
+    const r = await fetch(URLS.enc);
+    const data = await r.json();
+    encLayer = L.geoJSON(data,{
+      style:{fillColor:'#00bcd4',color:'#006064',weight:.5,fillOpacity:.4},
+      onEachFeature:(f,l)=>l.bindPopup(`<b>Encharcamiento</b><br>${f.properties.Peligro}`)
+    });
+  } catch(e) { console.warn('Enc:',e.message); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// RENDER IEP
+// ════════════════════════════════════════════════════════════════
+function renderIEP() {
+  if (!iepData) return;
+  if (iepLayer) map.removeLayer(iepLayer);
+  iepLayer = L.geoJSON(iepData, {
+    style: feature => {
+      const p = feature.properties;
+      const riesgo = p.vulnerabilidad || 'Sin amenaza prioritaria';
+      const vis = activeIEP.has(Number(p.iep_clase))
+        && (p.iep_mean||0) >= iepMin
+        && (activeMun==='todos' || p.mun===activeMun)
+        && activeRisk.has(riesgo);
+      if (!vis) return {fillOpacity:0,opacity:0,weight:0};
+      return {fillColor:IEP_COLORS[p.iep_clase]||'#aaa',fillOpacity:layerOpacity,color:'#fff',weight:.15,opacity:.5};
+    },
+    onEachFeature: (feature, layer) => {
+      layer.on('click', () => showManzanaInfo(feature.properties));
+    }
+  });
+  if (document.getElementById('sw-iep').classList.contains('on')) iepLayer.addTo(map);
+}
+
+// ════════════════════════════════════════════════════════════════
+// TOGGLE CAPAS
+// ════════════════════════════════════════════════════════════════
+function toggleLayer(name) {
+  const sw = document.getElementById('sw-'+name);
+  const on = sw.classList.contains('on');
+  if (on) {
+    sw.classList.remove('on');
+    if(name==='iep'  && iepLayer)  map.removeLayer(iepLayer);
+    if(name==='inun' && inunLayer) map.removeLayer(inunLayer);
+    if(name==='enc'  && encLayer)  map.removeLayer(encLayer);
+  } else {
+    sw.classList.add('on');
+    if(name==='iep')  { if(iepLayer) iepLayer.addTo(map); else loadIEP().then(()=>iepLayer?.addTo(map)); }
+    if(name==='inun') { if(inunLayer) inunLayer.addTo(map); else loadInundacion().then(()=>inunLayer?.addTo(map)); }
+    if(name==='enc')  { if(encLayer) encLayer.addTo(map);  else loadEncharcamiento().then(()=>encLayer?.addTo(map)); }
+  }
+}
+
+function toggleBase(name, btn) {
+  Object.keys(baseLayers).forEach(k => map.removeLayer(baseLayers[k]));
+  document.querySelectorAll('.base-btn').forEach(b => b.classList.remove('active'));
+  baseLayers[name].addTo(map);
+  btn.classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════════════
+// FILTROS
+// ════════════════════════════════════════════════════════════════
+function toggleIEP(clase, btn) {
+  btn.classList.toggle('active');
+  if(activeIEP.has(clase)) activeIEP.delete(clase); else activeIEP.add(clase);
+  renderIEP();
+}
+function filterByIEP(val) {
+  iepMin = parseFloat(val);
+  document.getElementById('iep-min-label').textContent = parseFloat(val).toFixed(2);
+  renderIEP();
+}
+function toggleTR(tr, btn) {
+  btn.classList.toggle('active');
+  if(activeTR.has(tr)) activeTR.delete(tr); else activeTR.add(tr);
+  if(inunLayer) {
+    const C={'10 años':'#0d47a1','25 años':'#1565c0','100 años':'#1976d2','500 años':'#42a5f5','1000 años':'#90caf9'};
+    inunLayer.setStyle(f=>{const v=activeTR.has(f.properties.Per_Retorn);return{fillColor:C[f.properties.Per_Retorn]||'#1976d2',color:'#0d47a1',weight:.5,fillOpacity:v?.35:0,opacity:v?.6:0};});
+  }
+}
+function toggleRisk(risk, btn) {
+  btn.classList.toggle('active');
+  if(activeRisk.has(risk)) activeRisk.delete(risk); else activeRisk.add(risk);
+  renderIEP();
+}
+function filterMun(mun, btn) {
+  document.querySelectorAll('.mun-chip').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  activeMun = mun;
+  renderIEP();
+  if(mun!=='todos' && iepData) {
+    const feats = iepData.features.filter(f=>f.properties.mun===mun);
+    if(feats.length) {
+      map.fitBounds(L.geoJSON({type:'FeatureCollection',features:feats}).getBounds(),{padding:[40,80]});
+    }
+  } else { zoomToZMM(); }
+  closeSheet();
+}
+function resetFilters() {
+  activeIEP=new Set([1,2,3,4,5]); activeTR=new Set(['10 años','25 años','100 años','500 años','1000 años']);
+  activeMun='todos'; iepMin=0;
+  activeRisk=new Set(['Sin amenaza prioritaria','Inundación','Deslizamiento','Erosión','Expansión urbana no controlada']);
+  document.getElementById('iep-slider').value=0;
+  document.getElementById('iep-min-label').textContent='0.0';
+  document.querySelectorAll('.fchip,.mun-chip').forEach(b=>b.classList.add('active'));
+  document.querySelectorAll('.mun-chip').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.mun-chip').classList.add('active');
+  renderIEP(); zoomToZMM();
+  showToast('✓ Filtros reseteados');
+}
+
+// ════════════════════════════════════════════════════════════════
+// INFO MANZANA
+// ════════════════════════════════════════════════════════════════
+function showManzanaInfo(p) {
+  const color = IEP_COLORS[p.iep_clase] || '#888';
+  const icons = {'Sin amenaza prioritaria':'🟢','Inundación':'💧','Deslizamiento':'⛰️','Erosión':'🌱','Expansión urbana no controlada':'🏗️'};
+  const amenaza = p.vulnerabilidad || '—';
+  document.getElementById('is-body').innerHTML = `
+    <div class="ip-row"><span class="ip-key">CVEGEO</span><span class="ip-val" style="font-size:11px">${p.CVEGEO}</span></div>
+    <div class="ip-row"><span class="ip-key">Municipio</span><span class="ip-val">${p.mun||'—'}</span></div>
+    <div class="ip-row"><span class="ip-key">Población</span><span class="ip-val">${(p.POB1||0).toLocaleString()} hab</span></div>
+    <div class="ip-row"><span class="ip-key">IEP medio</span><span class="ip-val" style="color:${color}">${(p.iep_mean||0).toFixed(3)}</span></div>
+    <div class="ip-row"><span class="ip-key">Tipo de riesgo</span><span class="ip-val">${icons[amenaza]||'⚠️'} ${amenaza}</span></div>
+    <div class="ip-iep-bar" style="background:linear-gradient(90deg,${color} ${(p.iep_mean||0)*100}%,var(--border) 0%)"></div>
+    <div class="ip-iep-label" style="color:${color}; margin-top:4px;">● ${p.iep_label||'—'}</div>
+  `;
+  document.getElementById('info-sheet').classList.add('open');
+  // Cerrar bottom sheet si está abierto
+  closeSheet();
+}
+function closeInfoSheet() {
+  document.getElementById('info-sheet').classList.remove('open');
+}
+
+// ════════════════════════════════════════════════════════════════
+// BOTTOM SHEET
+// ════════════════════════════════════════════════════════════════
+function openSheet(tab) {
+  closeInfoSheet();
+  document.getElementById('sheet-overlay').classList.add('show');
+  document.getElementById('bottom-sheet').classList.add('open');
+  // Activar tab
+  document.querySelectorAll('.sheet-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sheet-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('st-'+tab).classList.add('active');
+  const tabs = ['capas','filtros','stats','info'];
+  const idx = tabs.indexOf(tab);
+  document.querySelectorAll('.sheet-tab')[idx]?.classList.add('active');
+}
+function closeSheet() {
+  document.getElementById('sheet-overlay').classList.remove('show');
+  document.getElementById('bottom-sheet').classList.remove('open');
+}
+function showSheetTab(id, btn) {
+  document.querySelectorAll('.sheet-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sheet-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('st-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// Swipe down para cerrar sheet
+let touchStartY = 0;
+document.getElementById('bottom-sheet').addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, {passive:true});
+document.getElementById('bottom-sheet').addEventListener('touchend', e => {
+  if (e.changedTouches[0].clientY - touchStartY > 80) closeSheet();
+}, {passive:true});
+
+// ════════════════════════════════════════════════════════════════
+// UTILIDADES
+// ════════════════════════════════════════════════════════════════
+function zoomToZMM() { map.flyTo(ZMM_CENTER, ZMM_ZOOM, {duration:1.2}); }
+function toggleOpacity() {
+  layerOpacity = layerOpacity===0.85 ? 0.5 : layerOpacity===0.5 ? 1.0 : 0.85;
+  showToast(`Opacidad: ${Math.round(layerOpacity*100)}%`);
+  renderIEP();
+}
+function setLoadMsg(msg) { const e=document.getElementById('ld-msg'); if(e) e.textContent=msg; }
+function showToast(msg, ms=2500) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), ms);
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAIN
+// ════════════════════════════════════════════════════════════════
+async function main() {
+  initMap();
+  await loadIEP();
+  setLoadMsg('Cargando inundación...');
+  await loadInundacion();
+  setLoadMsg('Cargando encharcamiento...');
+  await loadEncharcamiento();
+  setTimeout(() => {
+    const ld = document.getElementById('loading');
+    ld.classList.add('fade');
+    setTimeout(()=>ld.style.display='none', 500);
+    showToast('✓ Listo · Toca una manzana para ver el riesgo');
+  }, 400);
+}
+main();
+</script>
+</body>
+</html>
