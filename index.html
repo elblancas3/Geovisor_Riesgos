@@ -284,7 +284,7 @@ input[type=range]::-webkit-slider-thumb {
     <div id="sidebar-header">
       <div class="sh-label">Geomática MX · ZMM</div>
       <div class="sh-title">Riesgo<br>Metropolitano</div>
-      <div class="sh-sub">Zona Metropolitana de Monterrey · 2025</div>
+      <div class="sh-sub">Zona Metropolitana de Monterrey · 2026</div>
       <div class="sh-status">
         <span class="badge badge-g">✓ IEP v2.0</span>
         <span class="badge badge-o">59,582 manzanas</span>
@@ -347,13 +347,6 @@ input[type=range]::-webkit-slider-thumb {
           <div class="toggle-sw" id="sw-enc"></div>
         </div>
 
-        <div class="layer-item" id="li-geo" onclick="toggleLayer('geo')">
-          <div class="layer-dot" style="background:#ff6d00"></div>
-          <span class="layer-name">Suscept. geológica</span>
-          <span class="layer-count">161,734</span>
-          <div class="toggle-sw" id="sw-geo"></div>
-        </div>
-
         <div class="sec-label" style="margin-top:18px;">Ellipsis Drive</div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;color:var(--text-muted);">
           <div style="color:var(--green);font-weight:700;margin-bottom:4px;">● Conectado</div>
@@ -410,14 +403,17 @@ input[type=range]::-webkit-slider-thumb {
           <span class="mun-btn active" onclick="filterMun('todos',this)">Todos</span>
           <span class="mun-btn" onclick="filterMun('Apodaca',this)">Apodaca</span>
           <span class="mun-btn" onclick="filterMun('García',this)">García</span>
-          <span class="mun-btn" onclick="filterMun('San Pedro GG',this)">San Pedro</span>
-          <span class="mun-btn" onclick="filterMun('Escobedo',this)">Escobedo</span>
+          <span class="mun-btn" onclick="filterMun('San Pedro Garza García',this)">San Pedro GG</span>
+          <span class="mun-btn" onclick="filterMun('General Escobedo',this)">Escobedo</span>
           <span class="mun-btn" onclick="filterMun('Guadalupe',this)">Guadalupe</span>
           <span class="mun-btn" onclick="filterMun('Juárez',this)">Juárez</span>
           <span class="mun-btn" onclick="filterMun('Monterrey',this)">Monterrey</span>
           <span class="mun-btn" onclick="filterMun('Santiago',this)">Santiago</span>
-          <span class="mun-btn" onclick="filterMun('Sta Catarina',this)">Sta Catarina</span>
-          <span class="mun-btn" onclick="filterMun('San Nicolás',this)">San Nicolás</span>
+          <span class="mun-btn" onclick="filterMun('Santa Catarina',this)">Sta Catarina</span>
+          <span class="mun-btn" onclick="filterMun('San Nicolás de los Garza',this)">San Nicolás</span>
+          <span class="mun-btn" onclick="filterMun('Cadereyta Jiménez',this)">Cadereyta</span>
+          <span class="mun-btn" onclick="filterMun('Salinas Victoria',this)">Salinas Vic.</span>
+          <span class="mun-btn" onclick="filterMun('Montemorelos',this)">Montemorelos</span>
         </div>
 
         <div style="margin-top:16px;">
@@ -477,7 +473,7 @@ input[type=range]::-webkit-slider-thumb {
           </div>
         </div>
 
-        <div class="sec-label" style="margin-top:14px;">Cambio uso de suelo 2017→2025</div>
+        <div class="sec-label" style="margin-top:14px;">Cambio uso de suelo 2017→2026</div>
         <div style="background:var(--surface2);border-left:3px solid var(--red);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:8px;">
           <div style="font-size:22px;font-weight:900;color:var(--red)">33,675 ha</div>
           <div style="font-size:11px;color:var(--text-muted);">Bosque → Urbano (Sierra Madre)</div>
@@ -529,7 +525,7 @@ input[type=range]::-webkit-slider-thumb {
         <div class="sec-label" style="margin-top:14px;">Créditos</div>
         <div style="font-size:12px;color:var(--text-muted);">
           Geomática MX · Blancas & Gómez Taller<br>
-          Monterrey, Nuevo León, México · 2025
+          Monterrey, Nuevo León, México · 2026
         </div>
       </div>
 
@@ -589,7 +585,7 @@ const URLS = {
   inun: 'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/a8af25dd-475d-46b8-9bc1-759d941d47da/data?token=epat_PvkiDG6HI1UvaVwmHp1EVHrYp13ulTZI9MltwXpftV7xjpz3egDBrWPsRwUxTM5m',
   enc:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/79425eb9-ad0c-4cf0-afde-7d13c2753c76/data?token=epat_ByHtH5D7N42eYUKoNBF0fgOSzaXV4LYob4EtEPbxgvD9nrAffpuN9KdLHGFWGZUn',
   geo:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/f8c2645d-dcca-4baa-bb5c-d881c055bd75/data?token=epat_rSSX32ziWBgS1rTk14CvNpKRmkFTyucDA8EtjVATZWm9BpjmQnWlHMe82MR77ggT',
-  iep:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/e66b5d39-386b-4384-a0f0-aea7365de535/data?token=epat_3cyzt8KUGxCE6vTvDjRgG77kKgSzROFc015WFpRUM6OFMVIykj4Slf3AhliGytnV',
+  iep:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/19e4bebd-f359-4463-aeb1-e993bce4de8c/data?token=epat_iLYyKxU7yllRD4xmi2NwuRV1MgvMt8DAPYm0KtlfR0S2pZmL2jUTiYdaEUb838sq',
 };
 
 // ── Ellipsis Drive — IEP manzanas (descubrimiento automático) ───
@@ -896,11 +892,21 @@ function showFeatureInfo(p) {
   const iepColors = { 1:'#1a9641',2:'#a6d96a',3:'#ffc107',4:'#f46d43',5:'#d73027' };
   const color = iepColors[p.iep_clase] || '#888';
 
+  const amenazaIcons = {
+    'Sin amenaza prioritaria':        '🟢',
+    'Inundación':                     '💧',
+    'Deslizamiento':                  '⛰️',
+    'Erosión':                        '🌱',
+    'Expansión urbana no controlada': '🏗️',
+  };
+  const amenaza = p.vulnerabilidad || '—';
+
   body.innerHTML = `
     <div class="ip-row"><span class="ip-key">CVEGEO</span><span class="ip-val">${p.CVEGEO}</span></div>
     <div class="ip-row"><span class="ip-key">Municipio</span><span class="ip-val">${p.mun||'—'}</span></div>
     <div class="ip-row"><span class="ip-key">Población</span><span class="ip-val">${(p.POB1||0).toLocaleString()} hab</span></div>
     <div class="ip-row"><span class="ip-key">IEP medio</span><span class="ip-val" style="color:${color}">${(p.iep_mean||0).toFixed(3)}</span></div>
+    <div class="ip-row"><span class="ip-key">Tipo de riesgo</span><span class="ip-val">${amenazaIcons[amenaza]||'⚠️'} ${amenaza}</span></div>
     <div class="ip-iep-bar" style="background:linear-gradient(90deg,${color} ${(p.iep_mean||0)*100}%,var(--border) 0%)"></div>
     <div class="ip-iep-label" style="color:${color}">● ${p.iep_label||'—'}</div>
   `;
@@ -935,11 +941,22 @@ function searchPlace(q) {
   // Buscar dentro del GeoJSON por municipio
   if (!iepData) return;
   const munMap = {
-    'apodaca': [25.78,-100.19], 'garcia': [25.81,-100.59],
-    'san pedro': [25.65,-100.41], 'escobedo': [25.79,-100.32],
-    'guadalupe': [25.68,-100.26], 'juarez': [25.64,-100.09],
-    'monterrey': [25.67,-100.31], 'santiago': [25.43,-100.15],
-    'catarina': [25.67,-100.46], 'nicolás': [25.74,-100.30]
+    'apodaca':      [25.78,-100.19],
+    'garcía':       [25.81,-100.59],
+    'garcia':       [25.81,-100.59],
+    'san pedro':    [25.65,-100.41],
+    'escobedo':     [25.79,-100.32],
+    'guadalupe':    [25.68,-100.26],
+    'juárez':       [25.64,-100.09],
+    'juarez':       [25.64,-100.09],
+    'monterrey':    [25.67,-100.31],
+    'santiago':     [25.43,-100.15],
+    'catarina':     [25.67,-100.46],
+    'nicolás':      [25.74,-100.30],
+    'nicolas':      [25.74,-100.30],
+    'cadereyta':    [25.59,-99.99],
+    'salinas':      [25.95,-100.29],
+    'montemorelos': [25.19,-99.83],
   };
   const ql = q.toLowerCase();
   for (const [k,v] of Object.entries(munMap)) {
