@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geovisor Riesgo Metropolitano</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+:root {
+  --bg:#0f1012; --surface:#181a1e; --surface2:#22252b; --border:#2e3138;
+  --blue:#2979ff; --blue2:#82b1ff;
+  --orange:#ff6d00; --orange2:#ffab40;
+  --green:#00e676; --green2:#69f0ae;
+  --red:#ff1744; --red2:#ff8a80;
+  --yellow:#ffd740;
+  --purple:#d500f9; --teal:#1de9b6;
+  --text:#f0f2f5; --text-dim:#9aa3b0; --text-muted:#4a5260;
+  --iep1:#1a9641; --iep2:#a6d96a; --iep3:#ffc107; --iep4:#f46d43; --iep5:#d73027;
+  --sidebar:320px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; }
+body { background:var(--bg); color:var(--text); font-family:'Barlow Condensed',sans-serif; font-size:15px; }
+
+/* ── LAYOUT ── */
+#app { display:flex; height:100vh; width:100vw; position:relative; }
+#map { flex:1; height:100%; z-index:1; }
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width:var(--sidebar); height:100%;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex; flex-direction:column;
+  z-index:10; flex-shrink:0;
+  overflow:hidden;
+}
+#sidebar-header {
+  background:linear-gradient(135deg,#1a6fe8,#7b2fff);
+  padding:20px 20px 16px;
+  flex-shrink:0;
+}
+.sh-label { font-size:9px; font-weight:700; letter-spacing:3px; text-transform:uppercase; opacity:.6; margin-bottom:6px; }
+.sh-title { font-size:26px; font-weight:900; text-transform:uppercase; letter-spacing:-1px; line-height:1; }
+.sh-sub { font-size:12px; opacity:.7; margin-top:5px; }
+.sh-status { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+.badge {
+  padding:3px 10px; border-radius:100px; font-size:10px; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase;
+}
+.badge-g { background:rgba(0,230,118,.2); color:var(--green); border:1px solid rgba(0,230,118,.3); }
+.badge-o { background:rgba(255,109,0,.2); color:var(--orange2); border:1px solid rgba(255,109,0,.3); }
+.badge-b { background:rgba(41,121,255,.2); color:var(--blue2); border:1px solid rgba(41,121,255,.3); }
+
+/* ── TABS ── */
+#sidebar-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+.stab {
+  flex:1; padding:12px 8px; text-align:center; font-size:10px; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; color:var(--text-muted);
+  cursor:pointer; border-bottom:2px solid transparent; transition:all .15s;
+}
+.stab:hover { color:var(--text-dim); }
+.stab.active { color:var(--blue2); border-bottom-color:var(--blue2); background:rgba(41,121,255,.05); }
+
+/* ── SIDEBAR BODY ── */
+#sidebar-body { flex:1; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+.s-panel { display:none; padding:16px; }
+.s-panel.active { display:block; }
+
+/* ── SECTION HEADERS ── */
+.sec-label { font-size:9px; font-weight:800; letter-spacing:2.5px; text-transform:uppercase; color:var(--orange2); margin-bottom:6px; margin-top:14px; }
+.sec-label:first-child { margin-top:0; }
+
+/* ── LAYER TOGGLES ── */
+.layer-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; border-radius:8px; margin-bottom:4px;
+  background:var(--surface2); border:1px solid var(--border);
+  cursor:pointer; transition:all .15s;
+}
+.layer-item:hover { border-color:var(--blue2); }
+.layer-item.active { border-color:var(--blue); background:rgba(41,121,255,.08); }
+.layer-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.layer-name { flex:1; font-size:13px; font-weight:600; }
+.layer-count { font-size:10px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+.toggle-sw {
+  width:32px; height:18px; border-radius:9px; position:relative;
+  background:var(--border); transition:background .2s; flex-shrink:0; cursor:pointer;
+}
+.toggle-sw.on { background:var(--blue); }
+.toggle-sw::after {
+  content:''; position:absolute; top:2px; left:2px;
+  width:14px; height:14px; border-radius:50%; background:#fff;
+  transition:transform .2s;
+}
+.toggle-sw.on::after { transform:translateX(14px); }
+
+/* ── FILTER CONTROLS ── */
+.filter-group { margin-bottom:14px; }
+.filter-label { font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; display:flex; justify-content:space-between; }
+.filter-label span { color:var(--text-muted); font-weight:400; font-family:'JetBrains Mono',monospace; font-size:10px; }
+
+/* IEP CLASS BUTTONS */
+.iep-btns { display:flex; gap:4px; flex-wrap:wrap; }
+.iep-btn {
+  padding:5px 10px; border-radius:6px; font-size:11px; font-weight:700;
+  cursor:pointer; border:2px solid transparent; transition:all .15s;
+  text-transform:uppercase; letter-spacing:.5px;
+}
+.iep-btn.active { border-color:currentColor; }
+
+/* SLIDER */
+.slider-wrap { padding:4px 0; }
+input[type=range] {
+  width:100%; height:4px; border-radius:2px;
+  background:var(--border); outline:none; cursor:pointer;
+  -webkit-appearance:none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:16px; height:16px;
+  border-radius:50%; background:var(--blue); cursor:pointer;
+}
+
+/* ── STATS CARDS ── */
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+.stat-c {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; padding:12px 10px; text-align:center;
+}
+.stat-c .sv { font-size:26px; font-weight:900; line-height:1; }
+.stat-c .sl { font-size:10px; color:var(--text-muted); margin-top:3px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+
+/* IEP BAR CHART */
+.iep-bars { margin:8px 0; }
+.iep-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.iep-bar-lbl { width:72px; font-size:11px; color:var(--text-dim); display:flex; align-items:center; gap:5px; }
+.iep-dot-sm { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.iep-bar-track { flex:1; height:14px; background:var(--surface2); border-radius:7px; overflow:hidden; }
+.iep-bar-fill { height:100%; border-radius:7px; transition:width .4s ease; }
+.iep-bar-val { width:42px; text-align:right; font-size:11px; font-weight:700; font-family:'JetBrains Mono',monospace; color:var(--text-dim); }
+
+/* ── INFO PANEL ── */
+#info-panel {
+  position:absolute; right:16px; top:16px;
+  width:280px; background:var(--surface);
+  border:1px solid var(--border); border-radius:12px;
+  z-index:500; display:none; overflow:hidden;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.ip-header {
+  padding:14px 16px 10px;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.ip-title { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; }
+.ip-close { cursor:pointer; color:var(--text-muted); font-size:18px; line-height:1; padding:2px 4px; }
+.ip-close:hover { color:var(--text); }
+.ip-body { padding:14px 16px; }
+.ip-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.ip-row:last-child { border-bottom:none; }
+.ip-key { color:var(--text-muted); font-weight:500; }
+.ip-val { font-weight:800; font-family:'JetBrains Mono',monospace; font-size:12px; }
+.ip-iep-bar { height:6px; border-radius:3px; margin-top:10px; margin-bottom:4px; }
+.ip-iep-label { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:1px; }
+
+/* ── SEARCH BOX ── */
+#search-box {
+  position:absolute; top:16px; left:calc(var(--sidebar) + 16px);
+  z-index:500; display:flex; gap:8px;
+}
+#search-input {
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--text); padding:10px 14px; border-radius:8px;
+  font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:500;
+  width:200px; outline:none; transition:border-color .15s;
+}
+#search-input:focus { border-color:var(--blue); }
+#search-input::placeholder { color:var(--text-muted); }
+.map-btn {
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--text); padding:10px 14px; border-radius:8px;
+  font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700;
+  cursor:pointer; transition:all .15s; text-transform:uppercase; letter-spacing:1px;
+  white-space:nowrap;
+}
+.map-btn:hover { border-color:var(--blue); color:var(--blue2); }
+
+/* ── LOADING ── */
+#loading {
+  position:absolute; inset:0; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:9999; transition:opacity .5s;
+}
+#loading.fade { opacity:0; pointer-events:none; }
+.ld-logo { font-size:52px; font-weight:900; text-transform:uppercase; letter-spacing:-2px; margin-bottom:8px; }
+.ld-logo span { color:var(--orange); }
+.ld-sub { font-size:13px; color:var(--text-muted); margin-bottom:32px; }
+.ld-bar { width:240px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.ld-prog { height:100%; background:linear-gradient(90deg,var(--blue),var(--orange)); border-radius:2px; animation:ldprog 2.5s ease-out forwards; }
+@keyframes ldprog { 0%{width:0} 60%{width:70%} 90%{width:90%} 100%{width:100%} }
+.ld-msg { font-size:11px; color:var(--text-muted); margin-top:10px; font-family:'JetBrains Mono',monospace; }
+
+/* ── LEGEND ── */
+#legend {
+  position:absolute; bottom:40px; right:16px; z-index:500;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:14px 16px;
+  box-shadow:0 4px 20px rgba(0,0,0,.3);
+  min-width:160px;
+}
+.leg-title { font-size:10px; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:var(--orange2); margin-bottom:10px; }
+.leg-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:12px; }
+.leg-swatch { width:14px; height:14px; border-radius:3px; flex-shrink:0; }
+.leg-label { color:var(--text-dim); font-weight:600; flex:1; }
+.leg-pct { font-size:10px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; }
+
+/* ── SCALE BAR ── */
+.leaflet-control-scale-line { background:var(--surface); border-color:var(--border); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:10px; }
+
+/* ── ATTRIBUTION ── */
+.leaflet-control-attribution { background:rgba(15,16,18,.8) !important; color:var(--text-muted) !important; font-size:10px !important; }
+.leaflet-control-attribution a { color:var(--blue2) !important; }
+
+/* ── ZOOM CONTROLS ── */
+.leaflet-control-zoom { border:1px solid var(--border) !important; border-radius:8px !important; overflow:hidden; }
+.leaflet-control-zoom a { background:var(--surface) !important; color:var(--text) !important; border-color:var(--border) !important; }
+.leaflet-control-zoom a:hover { background:var(--surface2) !important; }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+/* ── TOAST ── */
+#toast {
+  position:absolute; bottom:80px; left:50%; transform:translateX(-50%);
+  background:var(--surface2); border:1px solid var(--border);
+  padding:10px 20px; border-radius:8px; font-size:13px; font-weight:600;
+  z-index:600; opacity:0; transition:opacity .3s; pointer-events:none;
+  white-space:nowrap;
+}
+#toast.show { opacity:1; }
+
+/* ── MUNICIPALITY SELECTOR ── */
+.mun-btn {
+  display:inline-block; margin:2px; padding:4px 9px; border-radius:5px;
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+  cursor:pointer; border:1px solid var(--border); color:var(--text-dim);
+  transition:all .15s;
+}
+.mun-btn:hover { border-color:var(--blue); color:var(--blue2); }
+.mun-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+
+/* ── ELLIPSIS BADGE ── */
+.ellipsis-badge {
+  position:absolute; bottom:16px; left:calc(var(--sidebar) + 16px); z-index:500;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:6px 12px;
+  font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  color:var(--text-muted); display:flex; align-items:center; gap:6px;
+}
+.ed-dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="ld-logo">GEO<span>VISOR</span></div>
+  <div class="ld-sub">Riesgos Metropolitanos</div>
+  <div class="ld-bar"><div class="ld-prog"></div></div>
+  <div class="ld-msg" id="ld-msg">Inicializando mapa...</div>
+</div>
+
+<div id="app">
+
+  <!-- ══ SIDEBAR ══ -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <div class="sh-label">Geomática MX · ZMM</div>
+      <div class="sh-title">Riesgo<br>Metropolitano</div>
+      <div class="sh-sub">Zona Metropolitana de Monterrey · 2025</div>
+      <div class="sh-status">
+        <span class="badge badge-g">✓ IEP v2.0</span>
+        <span class="badge badge-o">59,582 manzanas</span>
+        <span class="badge badge-b">5 variables</span>
+      </div>
+    </div>
+
+    <div id="sidebar-tabs">
+      <div class="stab active" onclick="showTab('capas')">Capas</div>
+      <div class="stab" onclick="showTab('filtros')">Filtros</div>
+      <div class="stab" onclick="showTab('stats')">Stats</div>
+      <div class="stab" onclick="showTab('info')">Info</div>
+    </div>
+
+    <div id="sidebar-body">
+
+      <!-- ── CAPAS ── -->
+      <div class="s-panel active" id="tab-capas">
+        <div class="sec-label">Capas base</div>
+
+        <div class="layer-item active" onclick="toggleBase('carto')">
+          <div class="layer-dot" style="background:#555"></div>
+          <span class="layer-name">CartoDB Dark</span>
+          <span class="layer-count">base</span>
+          <div class="toggle-sw on" id="sw-carto"></div>
+        </div>
+        <div class="layer-item" onclick="toggleBase('osm')">
+          <div class="layer-dot" style="background:#aaa"></div>
+          <span class="layer-name">OpenStreetMap</span>
+          <span class="layer-count">base</span>
+          <div class="toggle-sw" id="sw-osm"></div>
+        </div>
+        <div class="layer-item" onclick="toggleBase('esri')">
+          <div class="layer-dot" style="background:#556B2F"></div>
+          <span class="layer-name">ESRI Satélite</span>
+          <span class="layer-count">base</span>
+          <div class="toggle-sw" id="sw-esri"></div>
+        </div>
+
+        <div class="sec-label" style="margin-top:18px;">Capas de análisis</div>
+
+        <div class="layer-item active" id="li-iep" onclick="toggleLayer('iep')">
+          <div class="layer-dot" style="background:linear-gradient(135deg,#1a9641,#d73027)"></div>
+          <span class="layer-name">IEP por manzana</span>
+          <span class="layer-count">59,582</span>
+          <div class="toggle-sw on" id="sw-iep"></div>
+        </div>
+
+        <div class="layer-item" id="li-inun" onclick="toggleLayer('inun')">
+          <div class="layer-dot" style="background:#2979ff"></div>
+          <span class="layer-name">Zona inundación</span>
+          <span class="layer-count">47,407</span>
+          <div class="toggle-sw" id="sw-inun"></div>
+        </div>
+
+        <div class="layer-item" id="li-enc" onclick="toggleLayer('enc')">
+          <div class="layer-dot" style="background:#00bcd4"></div>
+          <span class="layer-name">Encharcamiento</span>
+          <span class="layer-count">15,979</span>
+          <div class="toggle-sw" id="sw-enc"></div>
+        </div>
+
+        <div class="layer-item" id="li-geo" onclick="toggleLayer('geo')">
+          <div class="layer-dot" style="background:#ff6d00"></div>
+          <span class="layer-name">Suscept. geológica</span>
+          <span class="layer-count">161,734</span>
+          <div class="toggle-sw" id="sw-geo"></div>
+        </div>
+
+        <div class="sec-label" style="margin-top:18px;">Ellipsis Drive</div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;color:var(--text-muted);">
+          <div style="color:var(--green);font-weight:700;margin-bottom:4px;">● Conectado</div>
+          <div>pathId: 6f6c63ec-4765-...</div>
+          <div style="margin-top:6px;font-size:11px;">Sube los GeoTIFF procesados a tu Drive para activar las capas ráster (IEP continuo, NDVI, pendiente).</div>
+          <div style="margin-top:8px;">
+            <a href="https://app.ellipsis-drive.com/drive/external?pathId=6f6c63ec-4765-498f-b8a3-2fc35b889b30"
+               target="_blank"
+               style="color:var(--blue2);font-weight:700;text-decoration:none;font-size:11px;">
+              → Abrir Ellipsis Drive ↗
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── FILTROS ── -->
+      <div class="s-panel" id="tab-filtros">
+
+        <div class="sec-label">Nivel de riesgo IEP</div>
+        <div class="filter-group">
+          <div class="filter-label">Clases visibles <span id="iep-filter-label">todas</span></div>
+          <div class="iep-btns">
+            <span class="iep-btn active" style="background:rgba(26,150,65,.15);color:var(--iep1)" onclick="toggleIEP(1,this)">Muy bajo</span>
+            <span class="iep-btn active" style="background:rgba(166,217,106,.15);color:#7ab648" onclick="toggleIEP(2,this)">Bajo</span>
+            <span class="iep-btn active" style="background:rgba(255,193,7,.15);color:var(--yellow)" onclick="toggleIEP(3,this)">Moderado</span>
+            <span class="iep-btn active" style="background:rgba(244,109,67,.15);color:var(--iep4)" onclick="toggleIEP(4,this)">Alto</span>
+            <span class="iep-btn active" style="background:rgba(215,48,39,.15);color:var(--iep5)" onclick="toggleIEP(5,this)">Muy alto</span>
+          </div>
+        </div>
+
+        <div class="sec-label">IEP mínimo</div>
+        <div class="filter-group">
+          <div class="filter-label">Umbral mínimo <span id="iep-min-label">0.0</span></div>
+          <div class="slider-wrap">
+            <input type="range" id="iep-slider" min="0" max="1" step="0.05" value="0"
+                   oninput="filterByIEP(this.value)">
+          </div>
+        </div>
+
+        <div class="sec-label" style="margin-top:16px;">Período de retorno (inundación)</div>
+        <div class="filter-group">
+          <div class="filter-label">Filtrar por Tr</div>
+          <div class="iep-btns">
+            <span class="iep-btn active" style="background:rgba(41,121,255,.12);color:var(--blue2)" onclick="toggleTR('10 años',this)">Tr10</span>
+            <span class="iep-btn active" style="background:rgba(41,121,255,.12);color:var(--blue2)" onclick="toggleTR('25 años',this)">Tr25</span>
+            <span class="iep-btn active" style="background:rgba(41,121,255,.12);color:var(--blue2)" onclick="toggleTR('100 años',this)">Tr100</span>
+            <span class="iep-btn active" style="background:rgba(41,121,255,.12);color:var(--blue2)" onclick="toggleTR('500 años',this)">Tr500</span>
+            <span class="iep-btn active" style="background:rgba(41,121,255,.12);color:var(--blue2)" onclick="toggleTR('1000 años',this)">Tr1000</span>
+          </div>
+        </div>
+
+        <div class="sec-label" style="margin-top:16px;">Municipio</div>
+        <div id="mun-btns" style="line-height:2;">
+          <span class="mun-btn active" onclick="filterMun('todos',this)">Todos</span>
+          <span class="mun-btn" onclick="filterMun('Apodaca',this)">Apodaca</span>
+          <span class="mun-btn" onclick="filterMun('García',this)">García</span>
+          <span class="mun-btn" onclick="filterMun('San Pedro GG',this)">San Pedro</span>
+          <span class="mun-btn" onclick="filterMun('Escobedo',this)">Escobedo</span>
+          <span class="mun-btn" onclick="filterMun('Guadalupe',this)">Guadalupe</span>
+          <span class="mun-btn" onclick="filterMun('Juárez',this)">Juárez</span>
+          <span class="mun-btn" onclick="filterMun('Monterrey',this)">Monterrey</span>
+          <span class="mun-btn" onclick="filterMun('Santiago',this)">Santiago</span>
+          <span class="mun-btn" onclick="filterMun('Sta Catarina',this)">Sta Catarina</span>
+          <span class="mun-btn" onclick="filterMun('San Nicolás',this)">San Nicolás</span>
+        </div>
+
+        <div style="margin-top:16px;">
+          <button class="map-btn" style="width:100%;padding:12px;" onclick="resetFilters()">↺ Resetear filtros</button>
+        </div>
+      </div>
+
+      <!-- ── STATS ── -->
+      <div class="s-panel" id="tab-stats">
+        <div class="sec-label">IEP v2.0 — 5 variables</div>
+
+        <div class="stats-grid">
+          <div class="stat-c">
+            <div class="sv" style="color:#f46d43">21.9<span style="font-size:14px">%</span></div>
+            <div class="sl">Área riesgo alto+</div>
+          </div>
+          <div class="stat-c">
+            <div class="sv" style="color:#2979ff">16</div>
+            <div class="sl">Manzanas críticas</div>
+          </div>
+          <div class="stat-c">
+            <div class="sv" style="color:#ff6d00">1,552</div>
+            <div class="sl">Hab. en riesgo alto</div>
+          </div>
+          <div class="stat-c">
+            <div class="sv" style="color:#00e676">0.308</div>
+            <div class="sl">IEP media ZMM</div>
+          </div>
+        </div>
+
+        <div class="sec-label">Distribución IEP por área</div>
+        <div class="iep-bars">
+          <div class="iep-bar-row">
+            <span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep1)"></div>Muy bajo</span>
+            <div class="iep-bar-track"><div class="iep-bar-fill" style="width:8.4%;background:var(--iep1)"></div></div>
+            <span class="iep-bar-val">8.4%</span>
+          </div>
+          <div class="iep-bar-row">
+            <span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep2)"></div>Bajo</span>
+            <div class="iep-bar-track"><div class="iep-bar-fill" style="width:78%;background:var(--iep2)"></div></div>
+            <span class="iep-bar-val">78.0%</span>
+          </div>
+          <div class="iep-bar-row">
+            <span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep3)"></div>Moderado</span>
+            <div class="iep-bar-track"><div class="iep-bar-fill" style="width:12.4%;background:var(--iep3)"></div></div>
+            <span class="iep-bar-val">12.4%</span>
+          </div>
+          <div class="iep-bar-row">
+            <span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep4)"></div>Alto</span>
+            <div class="iep-bar-track"><div class="iep-bar-fill" style="width:1.2%;background:var(--iep4)"></div></div>
+            <span class="iep-bar-val">1.2%</span>
+          </div>
+          <div class="iep-bar-row">
+            <span class="iep-bar-lbl"><div class="iep-dot-sm" style="background:var(--iep5)"></div>Muy alto</span>
+            <div class="iep-bar-track"><div class="iep-bar-fill" style="width:0.2%;background:var(--iep5)"></div></div>
+            <span class="iep-bar-val">0.0%</span>
+          </div>
+        </div>
+
+        <div class="sec-label" style="margin-top:14px;">Cambio uso de suelo 2017→2025</div>
+        <div style="background:var(--surface2);border-left:3px solid var(--red);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:8px;">
+          <div style="font-size:22px;font-weight:900;color:var(--red)">33,675 ha</div>
+          <div style="font-size:11px;color:var(--text-muted);">Bosque → Urbano (Sierra Madre)</div>
+        </div>
+        <div style="background:var(--surface2);border-left:3px solid var(--orange);border-radius:0 6px 6px 0;padding:10px 12px;margin-bottom:8px;">
+          <div style="font-size:22px;font-weight:900;color:var(--orange2)">4,055 ha</div>
+          <div style="font-size:11px;color:var(--text-muted);">Bosque → Matorral</div>
+        </div>
+
+        <div class="sec-label" style="margin-top:14px;">Variables IEP activas</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.8;">
+          <div>● V1 Pendiente (DEM INEGI) — <strong style="color:var(--orange2)">30%</strong></div>
+          <div>● V2 NDVI Sentinel-2 GEE — <strong style="color:var(--green2)">25%</strong></div>
+          <div>● V3 Precip. CHIRPS — <strong style="color:var(--blue2)">20%</strong></div>
+          <div>● V4 Incendios FIRMS — <strong style="color:var(--red2)">15%</strong></div>
+          <div>● V5 Erodabilidad Geológica — <strong style="color:var(--purple)">10%</strong></div>
+        </div>
+      </div>
+
+      <!-- ── INFO ── -->
+      <div class="s-panel" id="tab-info">
+        <div class="sec-label">Acerca del sistema</div>
+        <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+          Sistema de análisis de riesgo metropolitano para la Zona Metropolitana de Monterrey. Integra datos satelitales Sentinel-2, precipitación CHIRPS y puntos de calor FIRMS con análisis topográfico del DEM INEGI.
+        </div>
+
+        <div class="sec-label">Metodología</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.8;margin-bottom:14px;">
+          <div><strong style="color:var(--text)">IEP</strong> basado en RUSLE adaptado a escala metropolitana. Pesos justificados por literatura sobre erosión en Sierra Madre Oriental (IMTA 2015, SEMARNAT 2020).</div>
+        </div>
+
+        <div class="sec-label">Stack tecnológico</div>
+        <div style="font-size:12px;color:var(--text-dim);line-height:1.8;">
+          <div>🛰️ Google Earth Engine — procesamiento satelital</div>
+          <div>🐍 Python + rasterio — modelado IEP</div>
+          <div>☁️ Ellipsis Drive — publicación capas</div>
+          <div>🗺️ Leaflet.js — geovisor web</div>
+        </div>
+
+        <div class="sec-label" style="margin-top:14px;">Archivos generados</div>
+        <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text-muted);line-height:2;">
+          <div>📁 iep_v2_manzanas_zmm.geojson</div>
+          <div>📁 iep_v2_continuo.tif</div>
+          <div>📁 iep_v2_clasificado.tif</div>
+          <div>📁 inundacion_visor.geojson</div>
+          <div>📁 encharcamiento_visor.geojson</div>
+        </div>
+
+        <div class="sec-label" style="margin-top:14px;">Créditos</div>
+        <div style="font-size:12px;color:var(--text-muted);">
+          Geomática MX · Blancas & Gómez Taller<br>
+          Monterrey, Nuevo León, México · 2025
+        </div>
+      </div>
+
+    </div><!-- /sidebar-body -->
+  </div><!-- /sidebar -->
+
+  <!-- ══ MAP ══ -->
+  <div id="map"></div>
+
+  <!-- ── SEARCH BOX ── -->
+  <div id="search-box">
+    <input type="text" id="search-input" placeholder="🔍 Buscar colonia, municipio..." oninput="searchPlace(this.value)">
+    <button class="map-btn" onclick="zoomToZMM()">⌂ ZMM</button>
+    <button class="map-btn" onclick="toggleOpacity()">◑ Opacidad</button>
+  </div>
+
+  <!-- ── INFO PANEL ── -->
+  <div id="info-panel">
+    <div class="ip-header">
+      <span class="ip-title">Manzana</span>
+      <span class="ip-close" onclick="closeInfo()">×</span>
+    </div>
+    <div class="ip-body" id="ip-body"></div>
+  </div>
+
+  <!-- ── LEGEND ── -->
+  <div id="legend">
+    <div class="leg-title" id="leg-title">IEP · Riesgo potencial</div>
+    <div class="leg-row"><div class="leg-swatch" style="background:var(--iep1)"></div><span class="leg-label">Muy bajo</span><span class="leg-pct">&lt;0.20</span></div>
+    <div class="leg-row"><div class="leg-swatch" style="background:var(--iep2)"></div><span class="leg-label">Bajo</span><span class="leg-pct">0.20–0.40</span></div>
+    <div class="leg-row"><div class="leg-swatch" style="background:var(--iep3)"></div><span class="leg-label">Moderado</span><span class="leg-pct">0.40–0.60</span></div>
+    <div class="leg-row"><div class="leg-swatch" style="background:var(--iep4)"></div><span class="leg-label">Alto</span><span class="leg-pct">0.60–0.80</span></div>
+    <div class="leg-row"><div class="leg-swatch" style="background:var(--iep5)"></div><span class="leg-label">Muy alto</span><span class="leg-pct">&gt;0.80</span></div>
+  </div>
+
+  <!-- ── ELLIPSIS BADGE ── -->
+  <div class="ellipsis-badge">
+    <div class="ed-dot"></div>
+    Ellipsis Drive conectado
+  </div>
+
+  <!-- ── TOAST ── -->
+  <div id="toast"></div>
+
+</div><!-- /app -->
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN
+// ════════════════════════════════════════════════════════════════
+const ELLIPSIS_PATH = '6f6c63ec-4765-498f-b8a3-2fc35b889b30';
+const ZMM_CENTER   = [25.67, -100.31];
+const ZMM_ZOOM     = 11;
+
+// ── Ellipsis Drive — URLs directas de descarga ──────────────────
+const URLS = {
+  inun: 'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/a8af25dd-475d-46b8-9bc1-759d941d47da/data?token=epat_PvkiDG6HI1UvaVwmHp1EVHrYp13ulTZI9MltwXpftV7xjpz3egDBrWPsRwUxTM5m',
+  enc:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/79425eb9-ad0c-4cf0-afde-7d13c2753c76/data?token=epat_ByHtH5D7N42eYUKoNBF0fgOSzaXV4LYob4EtEPbxgvD9nrAffpuN9KdLHGFWGZUn',
+  geo:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/f8c2645d-dcca-4baa-bb5c-d881c055bd75/data?token=epat_rSSX32ziWBgS1rTk14CvNpKRmkFTyucDA8EtjVATZWm9BpjmQnWlHMe82MR77ggT',
+  iep:  'https://api.ellipsis-drive.com/v3/path/f1f0bd76-4f3b-46c7-8b57-b594b4daef54/vector/timestamp/9933e141-0e04-4bb0-9df3-e0d6cb88a94f/file/e66b5d39-386b-4384-a0f0-aea7365de535/data?token=epat_3cyzt8KUGxCE6vTvDjRgG77kKgSzROFc015WFpRUM6OFMVIykj4Slf3AhliGytnV',
+};
+
+// ── Ellipsis Drive — IEP manzanas (descubrimiento automático) ───
+const IEP_PATH_ID = 'fc7336dd-aa2f-4590-b0a1-a3929f6ae2ad';
+const ED_API      = 'https://api.ellipsis-drive.com/v3';
+
+
+// ════════════════════════════════════════════════════════════════
+// ESTADO
+// ════════════════════════════════════════════════════════════════
+let map, layers = {}, baseLayers = {};
+let iepLayer = null, inunLayer = null, encLayer = null, geoLayer = null;
+let iepData = null;
+let activeIEP = new Set([1,2,3,4,5]);
+let activeTR  = new Set(['10 años','25 años','100 años','500 años','1000 años']);
+let activeMun = 'todos';
+let iepMin    = 0;
+let layerOpacity = 0.85;
+
+// ════════════════════════════════════════════════════════════════
+// INIT MAP
+// ════════════════════════════════════════════════════════════════
+function initMap() {
+  map = L.map('map', {
+    center: ZMM_CENTER, zoom: ZMM_ZOOM,
+    zoomControl: false
+  });
+
+  // Zoom control arriba-derecha
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+
+  // BASE LAYERS
+  baseLayers.carto = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution:'&copy; CartoDB', maxZoom:19 }
+  ).addTo(map);
+
+  baseLayers.osm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution:'&copy; OSM', maxZoom:19 }
+  );
+
+  baseLayers.esri = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution:'&copy; Esri', maxZoom:19 }
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// CARGAR IEP
+// ════════════════════════════════════════════════════════════════
+async function loadIEP() {
+  setLoadMsg('Conectando a Ellipsis Drive — IEP manzanas...');
+  try {
+    // 1) Obtener timestamps del path
+      setLoadMsg('Descargando manzanas IEP (~30MB)...');
+    const resp = await fetch(URLS.iep);
+    if (!resp.ok) throw new Error(`IEP: ${resp.status}`);
+    iepData = await resp.json();
+    renderIEP();
+    setLoadMsg('Cargando capas de inundación...');
+  } catch(e) {
+    console.warn('IEP desde Ellipsis falló:', e.message);
+    showToast('⚠️ IEP no cargado — verifica que la capa sea pública en Ellipsis Drive');
+  }
+}
+
+// Paleta IEP garantizada (fallback si el GeoJSON no trae iep_color)
+const IEP_COLORS = {
+  1: '#1a9641',  // Muy bajo  — verde
+  2: '#a6d96a',  // Bajo      — verde claro
+  3: '#ffc107',  // Moderado  — amarillo
+  4: '#f46d43',  // Alto      — naranja
+  5: '#d73027'   // Muy alto  — rojo
+};
+
+function getIEPColor(p) {
+  return IEP_COLORS[p.iep_clase] || p.iep_color || '#aaa';
+}
+
+function renderIEP(filter = false) {
+  if (!iepData) return;
+  if (iepLayer) map.removeLayer(iepLayer);
+
+  iepLayer = L.geoJSON(iepData, {
+    style: feature => {
+      const p = feature.properties;
+      const visible = activeIEP.has(Number(p.iep_clase))
+        && (p.iep_mean || 0) >= iepMin
+        && (activeMun === 'todos' || p.mun === activeMun);
+      if (!visible) {
+        return { fillOpacity: 0, opacity: 0, weight: 0 };
+      }
+      return {
+        fillColor:   getIEPColor(p),
+        fillOpacity: layerOpacity,
+        color:       '#ffffff',
+        weight:      0.15,
+        opacity:     0.5
+      };
+    },
+    onEachFeature: (feature, layer) => {
+      layer.on('click', () => showFeatureInfo(feature.properties));
+      layer.on('mouseover', function() {
+        const p = feature.properties;
+        const visible = activeIEP.has(Number(p.iep_clase))
+          && (p.iep_mean||0) >= iepMin
+          && (activeMun==='todos' || p.mun===activeMun);
+        if (visible) {
+          this.setStyle({ weight:1.5, color:'#fff', fillOpacity:1 });
+          this.bringToFront();
+        }
+      });
+      layer.on('mouseout', function() { iepLayer.resetStyle(this); });
+    }
+  });
+
+  if (document.getElementById('sw-iep').classList.contains('on')) {
+    iepLayer.addTo(map);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// CARGAR INUNDACIÓN
+// ════════════════════════════════════════════════════════════════
+async function loadInundacion() {
+  try {
+    const resp = await fetch(URLS.inun);
+    const data = await resp.json();
+
+    const COLORS_TR = {
+      '10 años':'#0d47a1','25 años':'#1565c0','100 años':'#1976d2',
+      '500 años':'#42a5f5','1000 años':'#90caf9'
+    };
+
+    inunLayer = L.geoJSON(data, {
+      style: feat => {
+        const tr = feat.properties.Per_Retorn;
+        const visible = activeTR.has(tr);
+        return {
+          fillColor: COLORS_TR[tr] || '#1976d2',
+          color: '#0d47a1', weight: 0.5,
+          fillOpacity: visible ? 0.35 : 0,
+          opacity: visible ? 0.6 : 0
+        };
+      },
+      onEachFeature: (feat, layer) => {
+        layer.bindPopup(`<b>Zona de Inundación</b><br>Período: <b>${feat.properties.Per_Retorn}</b>`, { className:'dark-popup' });
+      }
+    });
+  } catch(e) { console.warn('Inundación no cargada:', e.message); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// CARGAR ENCHARCAMIENTO
+// ════════════════════════════════════════════════════════════════
+async function loadEncharcamiento() {
+  try {
+    const resp = await fetch(URLS.enc);
+    const data = await resp.json();
+
+    encLayer = L.geoJSON(data, {
+      style: { fillColor:'#00bcd4', color:'#006064', weight:0.5, fillOpacity:0.4 },
+      onEachFeature: (feat, layer) => {
+        layer.bindPopup(`<b>Encharcamiento</b><br>Peligro: <b>${feat.properties.Peligro}</b>`);
+      }
+    });
+  } catch(e) { console.warn('Encharcamiento no cargado:', e.message); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// CARGAR SUSCEPTIBILIDAD GEOLÓGICA (datos embebidos)
+// ════════════════════════════════════════════════════════════════
+async function loadGeo() {
+  const GEO_COLORS = {'Muy Alta':'#d73027','Alta':'#f46d43','Media':'#fdae61'};
+  try {
+    const resp = await fetch(URLS.geo);
+    if (!resp.ok) throw new Error(`Geológico: ${resp.status}`);
+    const data = await resp.json();
+    geoLayer = L.geoJSON(data, {
+      style: feat => ({
+        fillColor: GEO_COLORS[feat.properties.Susceptibi] || '#fdae61',
+        color: '#7a3a00', weight: 0.4,
+        fillOpacity: 0.55
+      }),
+      onEachFeature: (feat, layer) => {
+        layer.bindPopup(
+          `<b>Susceptibilidad Geológica</b><br>` +
+          `Clase: <b style="color:${GEO_COLORS[feat.properties.Susceptibi]}">${feat.properties.Susceptibi}</b>`
+        );
+      }
+    });
+  } catch(e) { console.warn('Geológico no cargado:', e.message); }
+}
+
+// ════════════════════════════════════════════════════════════════
+// TOGGLE CAPAS
+// ════════════════════════════════════════════════════════════════
+function toggleLayer(name) {
+  const sw = document.getElementById('sw-'+name);
+  const li = document.getElementById('li-'+name);
+  const isOn = sw.classList.contains('on');
+
+  if (isOn) {
+    sw.classList.remove('on'); li.classList.remove('active');
+    if (name==='iep' && iepLayer) map.removeLayer(iepLayer);
+    if (name==='inun' && inunLayer) map.removeLayer(inunLayer);
+    if (name==='enc' && encLayer)  map.removeLayer(encLayer);
+    if (name==='geo' && geoLayer)  map.removeLayer(geoLayer);
+  } else {
+    sw.classList.add('on'); li.classList.add('active');
+    if (name==='iep')  { if(iepLayer) iepLayer.addTo(map); else { loadIEP().then(()=>{ if(iepLayer) iepLayer.addTo(map); }); }}
+    if (name==='inun') { if(inunLayer) inunLayer.addTo(map); else { loadInundacion().then(()=>{ if(inunLayer) inunLayer.addTo(map); }); }}
+    if (name==='enc')  { if(encLayer) encLayer.addTo(map); else { loadEncharcamiento().then(()=>{ if(encLayer) encLayer.addTo(map); }); }}
+    if (name==='geo')  { if(geoLayer) geoLayer.addTo(map); else { loadGeo().then(()=>{ if(geoLayer) geoLayer.addTo(map); }); }}
+  }
+}
+
+function toggleBase(name) {
+  Object.keys(baseLayers).forEach(k => {
+    map.removeLayer(baseLayers[k]);
+    document.getElementById('sw-'+k)?.classList.remove('on');
+    document.getElementById('sw-'+k)?.closest('.layer-item')?.classList.remove('active');
+  });
+  baseLayers[name].addTo(map);
+  const sw = document.getElementById('sw-'+name);
+  sw?.classList.add('on');
+  sw?.closest('.layer-item')?.classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════════════
+// FILTROS
+// ════════════════════════════════════════════════════════════════
+function toggleIEP(clase, btn) {
+  btn.classList.toggle('active');
+  if (activeIEP.has(clase)) activeIEP.delete(clase);
+  else activeIEP.add(clase);
+  document.getElementById('iep-filter-label').textContent =
+    activeIEP.size === 5 ? 'todas' : `${activeIEP.size} activas`;
+  renderIEP();
+}
+
+function filterByIEP(val) {
+  iepMin = parseFloat(val);
+  document.getElementById('iep-min-label').textContent = parseFloat(val).toFixed(2);
+  renderIEP();
+}
+
+function toggleTR(tr, btn) {
+  btn.classList.toggle('active');
+  if (activeTR.has(tr)) activeTR.delete(tr); else activeTR.add(tr);
+  if (inunLayer) {
+    inunLayer.setStyle(feat => {
+      const visible = activeTR.has(feat.properties.Per_Retorn);
+      const COLORS_TR = {'10 años':'#0d47a1','25 años':'#1565c0','100 años':'#1976d2','500 años':'#42a5f5','1000 años':'#90caf9'};
+      return { fillColor: COLORS_TR[feat.properties.Per_Retorn]||'#1976d2',
+               color:'#0d47a1', weight:0.5,
+               fillOpacity: visible ? 0.35 : 0, opacity: visible ? 0.6 : 0 };
+    });
+  }
+}
+
+function filterMun(mun, btn) {
+  document.querySelectorAll('.mun-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeMun = mun;
+  renderIEP();
+  if (mun !== 'todos' && iepData) {
+    // Zoom al municipio
+    const features = iepData.features.filter(f => f.properties.mun === mun);
+    if (features.length > 0) {
+      const tempLayer = L.geoJSON({ type:'FeatureCollection', features });
+      map.fitBounds(tempLayer.getBounds(), { padding:[40,40] });
+    }
+  } else {
+    zoomToZMM();
+  }
+}
+
+function resetFilters() {
+  activeIEP = new Set([1,2,3,4,5]);
+  activeTR  = new Set(['10 años','25 años','100 años','500 años','1000 años']);
+  activeMun = 'todos'; iepMin = 0;
+  document.getElementById('iep-slider').value = 0;
+  document.getElementById('iep-min-label').textContent = '0.0';
+  document.getElementById('iep-filter-label').textContent = 'todas';
+  document.querySelectorAll('.iep-btn').forEach(b => b.classList.add('active'));
+  document.querySelectorAll('.mun-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.mun-btn').classList.add('active');
+  renderIEP();
+  zoomToZMM();
+  showToast('✓ Filtros reseteados');
+}
+
+// ════════════════════════════════════════════════════════════════
+// INFO PANEL
+// ════════════════════════════════════════════════════════════════
+function showFeatureInfo(p) {
+  const panel = document.getElementById('info-panel');
+  const body  = document.getElementById('ip-body');
+  panel.style.display = 'block';
+
+  const iepColors = { 1:'#1a9641',2:'#a6d96a',3:'#ffc107',4:'#f46d43',5:'#d73027' };
+  const color = iepColors[p.iep_clase] || '#888';
+
+  body.innerHTML = `
+    <div class="ip-row"><span class="ip-key">CVEGEO</span><span class="ip-val">${p.CVEGEO}</span></div>
+    <div class="ip-row"><span class="ip-key">Municipio</span><span class="ip-val">${p.mun||'—'}</span></div>
+    <div class="ip-row"><span class="ip-key">Población</span><span class="ip-val">${(p.POB1||0).toLocaleString()} hab</span></div>
+    <div class="ip-row"><span class="ip-key">IEP medio</span><span class="ip-val" style="color:${color}">${(p.iep_mean||0).toFixed(3)}</span></div>
+    <div class="ip-iep-bar" style="background:linear-gradient(90deg,${color} ${(p.iep_mean||0)*100}%,var(--border) 0%)"></div>
+    <div class="ip-iep-label" style="color:${color}">● ${p.iep_label||'—'}</div>
+  `;
+}
+
+function closeInfo() {
+  document.getElementById('info-panel').style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════════
+// UTILIDADES
+// ════════════════════════════════════════════════════════════════
+function showTab(id) {
+  document.querySelectorAll('.s-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function zoomToZMM() {
+  map.flyTo(ZMM_CENTER, ZMM_ZOOM, { duration:1.2 });
+}
+
+function toggleOpacity() {
+  layerOpacity = layerOpacity === 0.85 ? 0.5 : layerOpacity === 0.5 ? 1.0 : 0.85;
+  showToast(`Opacidad: ${Math.round(layerOpacity*100)}%`);
+  renderIEP();
+}
+
+function searchPlace(q) {
+  if (q.length < 3) return;
+  // Buscar dentro del GeoJSON por municipio
+  if (!iepData) return;
+  const munMap = {
+    'apodaca': [25.78,-100.19], 'garcia': [25.81,-100.59],
+    'san pedro': [25.65,-100.41], 'escobedo': [25.79,-100.32],
+    'guadalupe': [25.68,-100.26], 'juarez': [25.64,-100.09],
+    'monterrey': [25.67,-100.31], 'santiago': [25.43,-100.15],
+    'catarina': [25.67,-100.46], 'nicolás': [25.74,-100.30]
+  };
+  const ql = q.toLowerCase();
+  for (const [k,v] of Object.entries(munMap)) {
+    if (k.includes(ql)) { map.flyTo(v, 13, {duration:1}); break; }
+  }
+}
+
+function setLoadMsg(msg) {
+  const el = document.getElementById('ld-msg');
+  if (el) el.textContent = msg;
+}
+
+function showToast(msg, duration=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAIN INIT
+// ════════════════════════════════════════════════════════════════
+async function main() {
+  initMap();
+  setLoadMsg('Cargando capas IEP...');
+  await loadIEP();
+  setLoadMsg('Cargando inundación...');
+  await loadInundacion();
+  setLoadMsg('Cargando encharcamiento...');
+  await loadEncharcamiento();
+
+  // Ocultar loading
+  setTimeout(() => {
+    const ld = document.getElementById('loading');
+    ld.classList.add('fade');
+    setTimeout(() => ld.style.display='none', 500);
+    showToast('✓ Geovisor ZMM listo · Click en manzana para ver IEP');
+  }, 500);
+}
+
+main();
+</script>
+
+<!-- POPUP STYLES -->
+<style>
+.leaflet-popup-content-wrapper {
+  background:var(--surface) !important;
+  border:1px solid var(--border) !important;
+  border-radius:8px !important;
+  color:var(--text) !important;
+  box-shadow:0 4px 20px rgba(0,0,0,.4) !important;
+}
+.leaflet-popup-tip { background:var(--surface) !important; }
+.leaflet-popup-content { font-family:'Barlow Condensed',sans-serif !important; font-size:14px !important; }
+</style>
+
+</body>
+</html>
